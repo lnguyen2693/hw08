@@ -36,21 +36,21 @@ the components of nano-ML's type system.
 
     (a) τ
 
-    > ...your answer here...
+    > a type
 
     (b) σ
     
-    > 
+    > a type scheme (new in this chapter)
 
     (c) Γ
     
-    > 
+    > a location 
 
     And finally, 
 
     (d) Say briefly what, in nano-ML, is the difference between τ and σ:
 
-    > 
+    > τ is a monomorphic type and σ polymorphic type
 
     _You are preparing for exercise 3._
 
@@ -103,41 +103,43 @@ assistance!
  2. (a) Yes or no: does the substitution `(α → sym) ∘ (β → bool) ∘ (γ → int)`
         replace type variable `α` with type `sym`?
 
-        >
+        > yes 
 
     (b) Yes or no: does the substitution `(α → sym) ∘ (β → bool) ∘ (γ → int)`
         replace type variable `β` with type `bool`?
 
-        >
+        > yes
 
     (c) Yes or no: does the substitution `(α → sym) ∘ (β → bool) ∘ (γ → int)`
         leave the type `γ list` unchanged?
 
-        >
+        > no
 
     (d) Which of the following nano-ML type expressions, written in concrete
         nano-ML syntax, are *instances* of the polymorphic type scheme 
         `∀α . α list → int`?  
         
+        (Q)
+
         For each one, please indicate whether it is an instance of the type
         scheme (True) or whether it is not an instance of the type scheme
         (False). 
         
         `(list int)`   True or False
 
-        >
+        > False
 
         `(list (list int))`  True or False
 
-        >
+        > False
 
         `((list (list int)) -> int)`  True or False
 
-        >
+        > True
 
         `((list int) int -> list)`  True or False
 
-        >
+        > False
 
     _You have a foundation on which to build for exercise 2._
 
@@ -156,21 +158,21 @@ explains how to solve constraints by finding substitutions.
     
     (a) Write $C'$:
 
-    >
+    > C' = int ~ α₂ /\ α₂ ~ α₃ list /\ α₄ ~ α₃ list list` 
     
     (b) Does $C'$ have a solution?  Answer yes or no.
 
-    >
+    > no
 
     Now define $C''$ as the result of applying substitution `(α₂ ↦ int)` to $C$.
 
     (c) Write $C''$:
     
-    >
+    > C'' = int ~ int /\ int ~ α₃ list /\ α₄ ~ α₃ list list` 
 
     (d) Does $C''$ have a solution?  Answer yes or no.
 
-    >
+    > no
     
 
     _You are getting ready for exercise 2._
@@ -190,29 +192,29 @@ explains how to solve constraints by finding substitutions.
 
     (a) Write a substitution `θ₁` that solves constraint `C₁`:
        
-    >
+    > θ₁ = (α ↦ int)
 
 
     (b) Write a substitution `θ₂` that solves constraint `C₂`:
 
-    >
+    > θ₂ = (α ↦ bool)
 
 
     (c) Does the composition `θ₂ ∘ θ₁` solve constraint `C₃ = C₁ /\ C₂`?
         Answer yes or no.
 
-    >
+    > yes
 
 
     (d) Can constraint `C₃` be solved? Answer yes or no.
 
-    >
+    > no
 
 
     (e) Can constraint `C₄` be solved? Answer yes or no.
 
 
-    >
+    > no
 
 
     _You are ready for exercise 2._
@@ -284,20 +286,21 @@ outputs of type inference for expression (+ 3 2).
         arguments to the function.) 
         In judgment C, Γ ⊢ e : τ, what does the type checker output for τ?
 
-        >
+        > 'c
 
         And what does the type checker output for C?
 
-        >
+        > T /\ T /\ T /\ ('a × 'b → 'c) ~ (int x bool → 'm)
 
     (b) Assume that `f` is bound in Γ to the type scheme `∀.'a`.
         In judgment C, Γ ⊢ e : τ, what does the type checker output for τ?
 
-        >
+        > Type inference fails (no valid type can be produced)
 
         And what does the type checker output for C?
 
-        >
+        > T /\ T /\ T /\ 
+        (ask if we just say that it fails)
 
     _You are ready for some of the easier parts of exercise 3._
 
@@ -322,7 +325,7 @@ references to that that function in this reading call it `too-poly`.
         appears in the top-level `val` binding.)
         
 
-        >
+        > ∀.τi 
 
 
     (b) Given that the rule for `lambda` says that we can pick any
@@ -330,14 +333,16 @@ references to that that function in this reading call it `too-poly`.
         the `lambda` expression in too-polymorphic type-check?  
         Put the word YES next to the best explanation:
 
+        (Ask - difference between option 1 and 3)
+
           - Parameter `empty-list` has to have type `(forall ('a)
-            (list 'a))`, but `τ₁` is not a `forall` type.
+            (list 'a))`, but `τ₁` is not a `forall` type. YES
 
           - Parameter `empty-list` has type `τ₁` = `(list 'a)`, which is
             not the same as `(list bool)`.
 
           - Parameter `empty-list` can have any type `τ₁` but no `τ₁` can
-            be equivalent to both `(list int)` and `(list bool)`.
+            be equivalent to both `(list int)` and `(list bool)`. YES
 
           - Parameter `empty-list` has type `τ₁` = `(list bool)`, which
             is not the same as `(list int)`.
@@ -359,19 +364,19 @@ references to that that function in this reading call it `too-poly`.
 
     (a) If τ' is β list, what are its free type variables?
 
-        >
+        > β
 
 
-    b) What set in this example plays the role of `{ α₁, ..., αₙ }` in Milner's
+    (b) What set in this example plays the role of `{ α₁, ..., αₙ }` in Milner's
         Let, which is ftv(τ')-ftv(Γ)?
 
-        >
+        > ftv(β')-ftv(Γ)
     
 
     (c) What is the *type scheme* to which `empty-list` (playing x) is 
         bound in the extended environment which is used to check $e$?
 
-        >
+        > ∀β . β list
 
 
     _You are ready for all of exercise 3._
