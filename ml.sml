@@ -1649,7 +1649,44 @@ fun unsatisfiableEquality (t1, t2) =
          | _ => raise InternalError "failed to synthesize canonical type"
   end
 (* constraint solving ((prototype)) 437b *)
-fun solve c = raise LeftAsExercise "solve"
+fun solve c = 
+  (case c 
+      of (ty1 ~ ty2) => 
+        let
+          fun solver (TYVAR type1, TYVAR type2) = type1 |--> TYVAR type2
+          |   solver (TYCON type1, TYCON type2) = 
+                if eqType (ty1, ty2) then idsubst
+                else raise TypeError "solve TYCON ~ TYCON"
+          |   solver (CONAPP (typ1, []), CONAPP (typ2, [])) = solver (typ1, typ2)
+          |   solver (CONAPP (typ1, (t1 :: types1)), CONAPP (typ2, (t2 :: types2))) =  
+                let
+                  val C1 = solver (typ1, typ2)
+                  val C2 = solver (CONAPP (t1, types1), CONAPP (t2, types2))
+                in
+                  compose (C1, C2)
+                end
+          |   solver (TYVAR type1, TYCON type2) = type1 |--> TYCON type2
+          |   solver (TYCON type1, TYVAR type2) = solver (ty2, ty1)
+
+          |   solver (TYVAR type1, CONAPP type2) = raise LeftAsExercise "TYVAR ~ CONAPP"
+          |   solver (CONAPP type1, TYVAR type2) = solver (ty2, ty1)
+
+          |   solver (_, _) = raise TypeError "(tycon can't equal tycon app"
+          
+        in
+          solver (ty1, ty2)
+        end
+      |  (con1 /\ con2) => 
+        let 
+          val theta1 = solve con1
+          val con2' = consubst theta1 con2
+          val theta2 = solve con2'
+        in 
+          compose (theta2, theta1)
+        end
+      |  TRIVIAL => idsubst)
+
+
 (* type declarations for consistency checking *)
 val _ = op solve : con -> subst
 (* constraint solving ((elided)) (THIS CAN'T HAPPEN -- claimed code was not used) *)
@@ -1657,6 +1694,37 @@ fun hasNoSolution c = (solve c; false) handle TypeError _ => true
 fun hasGoodSolution c = solves (solve c, c) handle TypeError _ => false
 val hasSolution = not o hasNoSolution : con -> bool
 fun solutionEquivalentTo (c, theta) = eqsubst (solve c, theta)
+
+(* unit testing *)
+val () = Unit.checkAssert "bool ~ bool can be solved"
+    (fn () => hasSolution (booltype ~ booltype))
+
+val () = Unit.checkAssert "TRIVIAL ^ TRIVIAL can be solved"
+    (fn () => hasSolution (TRIVIAL /\ TRIVIAL))
+
+val () = Unit.checkAssert "int ~ bool cannot be solved"
+    (fn () => hasNoSolution (inttype ~ booltype))
+
+val () = Unit.checkAssert "same type variables"
+    (fn () => solutionEquivalentTo (TYVAR "a" ~ TYVAR "a", []))
+
+val () = Unit.checkAssert "different type variables"
+    (fn () => solutionEquivalentTo (TYVAR "b" ~ TYVAR "a", "b" |--> (TYVAR "a")))
+
+val () = Unit.checkAssert "int ~ int can be solved"
+    (fn () => solutionEquivalentTo (inttype ~ inttype, idsubst))
+
+val () = Unit.checkAssert "dd"
+    (fn () => solutionEquivalentTo (TYVAR "a" ~ inttype, "a" |--> inttype))
+
+(* val () = Unit.checkAssert "dd"
+    (fn () => solutionEquivalentTo (CONAPP (TYVAR "a" ~ listtype, "a"  |--> inttype, idsubst)))  *)
+
+(* val () = Unit.checkAssert "d"
+    (fn () => hasNoSolution (TYVAR "a" ~ inttype))  *)
+
+
+
 (* utility functions for {\uml} S435c *)
 (* filled in when implementing uML *)
 (* exhaustiveness analysis for {\uml} S435b *)
@@ -2775,3 +2843,9 @@ val _ = if hasOption "NORUN" then ()
         else perform (strip_options DEFAULT (CommandLine.arguments ()))
 (* type declarations for consistency checking *)
 val _ = op strip_options : action -> string list -> action * string list
+
+
+
+(* reportWhenFailures() *)
+val () = Unit.reportWhenFailures()
+(* val () = Unit.report() *)
