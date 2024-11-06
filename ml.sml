@@ -2552,7 +2552,8 @@ val primitiveBasis =
                                funtype ([listtype alpha], listtype alpha)) :: 
                      [])
   end
-val predefs = 
+val predefined_included = false
+val predefs = if not predefined_included then [] else
                [ ";  predefined {\\nml} functions S423b "
                , "(define bind (x y alist)"
                , "  (if (null? alist)"
