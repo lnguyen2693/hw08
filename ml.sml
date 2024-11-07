@@ -1670,7 +1670,12 @@ fun solve c =
 
           |   solver (TYVAR type1, CONAPP (typ2, types2)) = 
                 let
-                  val occurs_check = List.foldl (fn ((tau, acc)) => acc andalso (not (eqType (ty1, tau)))) true types2
+                  val occurs_check = 
+                    List.foldl 
+                      (fn ((tau, acc)) => 
+                        acc andalso (not (eqType (ty1, tau)))) 
+                      true 
+                      types2
                 in
                   if occurs_check then type1 |--> ty2
                   else raise TypeError "ty1 occurs in ty2" 
