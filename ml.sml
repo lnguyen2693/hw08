@@ -1660,18 +1660,24 @@ fun solve c =
           |   solver (CONAPP (typ1, []), CONAPP (typ2, [])) = solver (typ1, typ2)
           |   solver (CONAPP (typ1, (t1 :: types1)), CONAPP (typ2, (t2 :: types2))) =  
                 let
-                  val C1 = solver (typ1, typ2)
-                  val C2 = solver (CONAPP (t1, types1), CONAPP (t2, types2))
+                  val C1 = (typ1 ~ typ2)
+                  val C2 = (CONAPP (t1, types1) ~ CONAPP (t2, types2))
                 in
-                  compose (C1, C2)
+                  solve (C1 /\ C2)
                 end
           |   solver (TYVAR type1, TYCON type2) = type1 |--> TYCON type2
           |   solver (TYCON type1, TYVAR type2) = solver (ty2, ty1)
 
-          |   solver (TYVAR type1, CONAPP type2) = raise LeftAsExercise "TYVAR ~ CONAPP"
+          |   solver (TYVAR type1, CONAPP (typ2, types2)) = 
+                let
+                  val occurs_check = List.foldl (fn ((tau, acc)) => acc andalso (not (eqType (ty1, tau)))) true types2
+                in
+                  if occurs_check then type1 |--> ty2
+                  else raise TypeError "ty1 occurs in ty2" 
+                end
           |   solver (CONAPP type1, TYVAR type2) = solver (ty2, ty1)
 
-          |   solver (_, _) = raise TypeError "(tycon can't equal tycon app"
+          |   solver (_, _) = raise TypeError "tycon can't equal tycon app"
           
         in
           solver (ty1, ty2)
@@ -1714,16 +1720,24 @@ val () = Unit.checkAssert "different type variables"
 val () = Unit.checkAssert "int ~ int can be solved"
     (fn () => solutionEquivalentTo (inttype ~ inttype, idsubst))
 
-val () = Unit.checkAssert "dd"
+val () = Unit.checkAssert "TYVAR TYCON solutionEquivalentTo"
     (fn () => solutionEquivalentTo (TYVAR "a" ~ inttype, "a" |--> inttype))
 
-(* val () = Unit.checkAssert "dd"
-    (fn () => solutionEquivalentTo (CONAPP (TYVAR "a" ~ listtype, "a"  |--> inttype, idsubst)))  *)
+val () = Unit.checkAssert "CONNAPP CONNAP solutionEquivalentTo"
+    (fn () => solutionEquivalentTo 
+      (CONAPP (TYVAR "a", [inttype,booltype]) ~ 
+       CONAPP (inttype  , [inttype,booltype]), 
+       "a" |--> inttype))
 
-(* val () = Unit.checkAssert "d"
-    (fn () => hasNoSolution (TYVAR "a" ~ inttype))  *)
+val () = Unit.checkAssert "CONAPP CONAPP hasSolution"
+    (fn () => hasSolution 
+      (CONAPP (TYVAR "a", [inttype, booltype]) ~ 
+       CONAPP (inttype  , [inttype,booltype]))) 
 
-
+(* Q: Do we need to check the 1st arg of CONAPP? *)
+val () = Unit.checkAssert "TYVAR CONAPP hasSolution"
+    (fn () => hasSolution
+      (TYVAR "a" ~ CONAPP ((TYVAR "a", [inttype, booltype]))))
 
 (* utility functions for {\uml} S435c *)
 (* filled in when implementing uML *)
