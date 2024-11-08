@@ -1851,14 +1851,14 @@ fun typeof (e, Gamma) =
                   let val alpha = freshtyvar ()
                   in (alpha ~ (tysubst theta alpha))
                   end) 
-                (freetyvarsGamma Gamma)
+                (inter (dom theta, freetyvarsGamma Gamma))
               val C' = conjoinConstraints cons
               val sigmas = 
                 List.map 
                   (fn (tau) => 
                     generalize(
                       tysubst theta tau, 
-                      (freetyvarsGamma Gamma) @ (freetyvarsConstraint C' ))) 
+                      union ((freetyvarsGamma Gamma), (freetyvarsConstraint C' )))) 
                   taus
               val bindings = ListPair.zipEq (xs, sigmas)
               val newGamma = 
@@ -1871,7 +1871,62 @@ fun typeof (e, Gamma) =
               if hasSolution (C' /\ C2) then (tau, C' /\ C2)
               else raise TypeError "LET type error"
             end
-        | ty (LETX (LETREC, bs, body)) = raise LeftAsExercise "type for LETREC"
+        | ty (LETX (LETREC, bs, body)) = 
+        (*  1. Pattern match LAMBDA (list, exp)
+            2. Create new gamma with bindnings (x, alpha)
+            3. Type check e1..en -> ([t1..tn, C_r]) 
+            4. Create C1, which is a conjunction of C_r and (t_i ~ alpha_i)
+            5. Create theta that satisfies C1  (val theta = solve(C1))
+            6. Create C' - conjunction of list (alpha ~ theta alpha) 
+            7. Create list sigmas - generalize of list (theta t_i) 
+            8. Create newGamma_2 - add binding (x_i, sigma_i)
+            9. Type check body --> get (tau, C_b) 
+           10. Return (tau, C' /\ C_b) *)
+            let 
+              val (xs,es) = ListPair.unzip bs
+              val alphas = List.map (fn _ => freshtyvar ()) xs
+              val extendedEnv = 
+                  ListPair.foldlEq (fn (x, alpha, acc) => bindtyscheme(x, FORALL([], alpha),acc)) Gamma (xs, alphas)
+              val (taus, C_r) = typesof(es, extendedEnv) 
+              val constraints = ListPair.mapEq (fn (tau, alpha) => (tau ~ alpha)) (taus, alphas)
+              val C1 = conjoinConstraints (C_r :: constraints)    
+              val theta = solve C1
+              (* in LET and LETREC, what is the alpha here, refer to rules on p.426 *)
+              val cons = List.map 
+                (fn (var) => 
+                  let val alpha = freshtyvar ()
+                  in (alpha ~ (tysubst theta alpha))
+                  end) 
+                (inter (dom theta, freetyvarsGamma Gamma))
+              (* val cons = List.map 
+                  (fn (var) => 
+                    let val alpha = freshtyvar ()
+                    in (alpha ~ (tysubst theta alpha))
+                    end) 
+                  (freetyvarsGamma Gamma)  *)
+              (* val varTheta = List.map (dom theta *)
+              (* val cons = List.map (fn (a) => (a ~ (tysubst theta a))) (inter (dom theta, freetyvarsGamma Gamma)) *)
+              val C' = conjoinConstraints cons
+              val sigmas = 
+                List.map 
+                  (fn (tau) => 
+                    generalize(
+                      tysubst theta tau, 
+                      union ((freetyvarsGamma Gamma), (freetyvarsConstraint C')))) 
+                  taus
+              val newGamma = 
+                ListPair.foldlEq 
+                  (fn (x, sigma, acc) => 
+                    bindtyscheme (x, sigma, acc)) 
+                  Gamma 
+                  (xs, sigmas)
+              val (tau, C_b) = typeof (body, newGamma)
+            in 
+              if hasSolution (C' /\ C_b) then (tau, C' /\ C_b)
+              else raise TypeError "LETREC type error"
+            end 
+  
+           
 (* type declarations for consistency checking *)
 val _ = op typeof  : exp      * type_env -> ty      * con
 val _ = op typesof : exp list * type_env -> ty list * con

@@ -25,3 +25,8 @@
 (check-principal-type (let ((x 10)) 20) int)
 (check-principal-type (let ((x 4) (y 6)) (* x y)) int)
 (check-type-error (let ((x (if #t 1 #f))) x))
+
+(check-principal-type (letrec () 2) int)
+(check-principal-type (letrec ([g (lambda () 1)]) (g)) int) 
+(check-principal-type (letrec ([g (lambda (a) a)]) (g 5)) int) 
+(* (check-type-error (letrec ([g (lambda (a) a)]))) *)
