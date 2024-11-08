@@ -1670,12 +1670,14 @@ fun solve c =
 
           |   solver (TYVAR type1, CONAPP (typ2, types2)) = 
                 let
+                  val types2list = freetyvars ty2
                   val occurs_check = 
-                    List.foldl 
+                    (not (eqType (ty1, typ2))) andalso
+                    List.foldl
                       (fn ((tau, acc)) => 
-                        acc andalso (not (eqType (ty1, tau)))) 
+                        acc andalso (not (type1 = tau))) 
                       true 
-                      types2
+                      types2list
                 in
                   if occurs_check then type1 |--> ty2
                   else raise TypeError "ty1 occurs in ty2" 
@@ -1697,6 +1699,21 @@ fun solve c =
         end
       |  TRIVIAL => idsubst)
 
+
+fun isIdempotent pairs =
+  let fun distinct a' (a, tau) = a <> a' andalso not (member a' (freetyvars tau))
+      fun good (prev', (a, tau)::next) =
+            List.all (distinct a) prev' andalso List.all (distinct a) next
+            andalso good ((a, tau)::prev', next)
+        | good (_, []) = true
+  in  good ([], pairs)
+  end
+
+val solve =
+  fn c => let val theta = solve c
+          in  if isIdempotent theta then theta
+              else raise BugInTypeInference "non-idempotent substitution"
+          end
 
 (* type declarations for consistency checking *)
 val _ = op solve : con -> subst
@@ -1739,10 +1756,13 @@ val () = Unit.checkAssert "CONAPP CONAPP hasSolution"
       (CONAPP (TYVAR "a", [inttype, booltype]) ~ 
        CONAPP (inttype  , [inttype,booltype]))) 
 
+val () = Unit.checkAssert "TYVAR CONNAP hasNoSolution"
+    (fn () => hasNoSolution (TYVAR "'a" ~ (CONAPP (TYCON "list", [TYVAR "'a"])))) 
+
 (* Q: Do we need to check the 1st arg of CONAPP? *)
 val () = Unit.checkAssert "TYVAR CONAPP hasSolution"
     (fn () => hasSolution
-      (TYVAR "a" ~ CONAPP ((TYVAR "a", [inttype, booltype]))))
+      (TYVAR "a" ~ CONAPP ((TYVAR "b", [inttype, booltype]))))
 
 (* utility functions for {\uml} S435c *)
 (* filled in when implementing uML *)
@@ -1760,7 +1780,14 @@ fun typeof (e, Gamma) =
             end
 
 (* function [[literal]], to infer the type of a literal constant ((prototype)) 438b *)
-      fun literal _ = raise LeftAsExercise "literal"
+      fun literal v = 
+        case v 
+        of NUM   _ => (inttype, TRIVIAL)
+        |  BOOLV _ => (booltype, TRIVIAL)
+        |  SYM   _ => (symtype, TRIVIAL)
+        (* |  NIL     => raise LeftAsExercise "finishthis"
+        |  PAIR  _ => raise LeftAsExercise "finishthis" *)
+        |  _ => raise LeftAsExercise "finishthis"
 
 (* function [[ty]], to infer the type of a \nml\ expression, given [[Gamma]] 438c *)
       fun ty (LITERAL n) = literal n
@@ -1780,9 +1807,40 @@ fun typeof (e, Gamma) =
         | ty (LETX (LETSTAR, (b :: bs), body)) = 
             ty (LETX (LET, [b], LETX (LETSTAR, bs, body)))
         (* more alternatives for [[ty]] ((prototype)) 438g *)
-        | ty (IFX (e1, e2, e3))        = raise LeftAsExercise "type for IFX"
-        | ty (BEGIN es)                = raise LeftAsExercise "type for BEGIN"
-        | ty (LAMBDA (formals, body))  = raise LeftAsExercise "type for LAMBDA"
+        | ty (IFX (e1, e2, e3))        = 
+            let
+              val (taus, C1) = typesof([e1, e2, e3], Gamma)
+              val C2 = List.nth (taus, 0) ~ booltype
+              val C3 = List.nth (taus, 1) ~ List.nth (taus, 2)
+              val cons = conjoinConstraints [C1, C2, C3]
+            in 
+              if hasSolution cons then (List.nth (taus, 2), cons)
+              else raise TypeError "IFX type error"
+            end
+        | ty (BEGIN [])                = (unittype, TRIVIAL)
+        | ty (BEGIN es)                = 
+            let
+              val (taus, C1) = typesof(es, Gamma)
+            in
+              if hasSolution C1 then (List.last taus, C1)
+              else raise TypeError "BEGIN type error"
+            end
+        | ty (LAMBDA (formals, body))  = 
+            let
+              val bindings = 
+                List.map (fn (formal) => (formal, freshtyvar ())) formals
+              val newGamma = 
+                List.foldl 
+                  (fn ((formal, alpha), acc) => 
+                    bindtyscheme (formal, FORALL ([], alpha), acc)) 
+                  Gamma 
+                  bindings
+              val alphas   = List.map (fn (formal, alpha) => alpha) bindings
+              val (tau, C1) = typeof (body, newGamma)
+            in
+              if hasSolution C1 then (funtype (alphas, tau), C1)
+              else raise TypeError "LAMBDA type error"
+            end
         | ty (LETX (LET, bs, body))    = raise LeftAsExercise "type for LET"
         | ty (LETX (LETREC, bs, body)) = raise LeftAsExercise "type for LETREC"
 (* type declarations for consistency checking *)

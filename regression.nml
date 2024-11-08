@@ -1,0 +1,23 @@
+;; step 2
+(check-principal-type 3 int)
+(check-principal-type #t bool)
+(check-principal-type 'hi sym)
+(check-type-error abcdefg) 
+
+;; step 4
+
+(check-principal-type (if #t 2 4) int)  
+(check-principal-type (if #t #t #f) bool)
+(check-type-error (if #t 'a' 1))
+(check-type-error (if 2 1 1))
+
+(check-principal-type (begin #t) bool)
+(check-principal-type (begin) unit)
+(check-principal-type (begin 1) int)
+(check-type-error (begin gvhbjko))
+
+
+
+(check-principal-type ((lambda () 5)) int)
+(check-principal-type (lambda (x) (* x 2))(int -> int))
+(check-type-error (lambda (x) y)) 
