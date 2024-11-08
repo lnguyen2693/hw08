@@ -1841,7 +1841,36 @@ fun typeof (e, Gamma) =
               if hasSolution C1 then (funtype (alphas, tau), C1)
               else raise TypeError "LAMBDA type error"
             end
-        | ty (LETX (LET, bs, body))    = raise LeftAsExercise "type for LET"
+        | ty (LETX (LET, bs, body))    = 
+            let
+              val (xs, es) = ListPair.unzip bs
+              val (taus, C1) = typesof(es, Gamma)
+              val theta = solve(C1)
+              val cons = List.map 
+                (fn (var) => 
+                  let val alpha = freshtyvar ()
+                  in (alpha ~ (tysubst theta alpha))
+                  end) 
+                (freetyvarsGamma Gamma)
+              val C' = conjoinConstraints cons
+              val sigmas = 
+                List.map 
+                  (fn (tau) => 
+                    generalize(
+                      tysubst theta tau, 
+                      (freetyvarsGamma Gamma) @ (freetyvarsConstraint C' ))) 
+                  taus
+              val bindings = ListPair.zipEq (xs, sigmas)
+              val newGamma = 
+                List.foldl 
+                  (fn ((x, sigma), acc) => bindtyscheme(x, sigma, acc)) 
+                  Gamma 
+                  bindings
+              val (tau, C2) = typeof(body, newGamma)
+            in
+              if hasSolution (C' /\ C2) then (tau, C' /\ C2)
+              else raise TypeError "LET type error"
+            end
         | ty (LETX (LETREC, bs, body)) = raise LeftAsExercise "type for LETREC"
 (* type declarations for consistency checking *)
 val _ = op typeof  : exp      * type_env -> ty      * con

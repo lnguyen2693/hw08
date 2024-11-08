@@ -17,7 +17,11 @@
 (check-type-error (begin gvhbjko))
 
 
-
 (check-principal-type ((lambda () 5)) int)
 (check-principal-type (lambda (x) (* x 2))(int -> int))
 (check-type-error (lambda (x) y)) 
+
+;; step 5
+(check-principal-type (let ((x 10)) 20) int)
+(check-principal-type (let ((x 4) (y 6)) (* x y)) int)
+(check-type-error (let ((x (if #t 1 #f))) x))
