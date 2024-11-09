@@ -1657,11 +1657,11 @@ fun solve c =
           |   solver (TYCON type1, TYCON type2) = 
                 if eqType (ty1, ty2) then idsubst
                 else raise TypeError "solve TYCON ~ TYCON"
-          |   solver (CONAPP (typ1, []), CONAPP (typ2, [])) = solver (typ1, typ2)
-          |   solver (CONAPP (typ1, (t1 :: types1)), CONAPP (typ2, (t2 :: types2))) =  
+          (* |   solver (CONAPP (typ1, []), CONAPP (typ2, [])) = solver (typ1, typ2) *)
+          |   solver (CONAPP (typ1, types1), CONAPP (typ2, types2)) =  
                 let
                   val C1 = (typ1 ~ typ2)
-                  val C2 = (CONAPP (t1, types1) ~ CONAPP (t2, types2))
+                  val C2 = ListPair.foldlEq (fn (t1, t2, acc) => (t1 ~ t2) /\ acc) TRIVIAL (types1, types2)
                 in
                   solve (C1 /\ C2)
                 end
@@ -1670,17 +1670,11 @@ fun solve c =
 
           |   solver (TYVAR type1, CONAPP (typ2, types2)) = 
                 let
-                  val types2list = freetyvars ty2
-                  val occurs_check = 
-                    (not (eqType (ty1, typ2))) andalso
-                    List.foldl
-                      (fn ((tau, acc)) => 
-                        acc andalso (not (type1 = tau))) 
-                      true 
-                      types2list
+                  val types2list = freetyvars (CONAPP (typ2, types2))
+                  val occurs_check = not (member type1 types2list)
                 in
-                  if occurs_check then type1 |--> ty2
-                  else raise TypeError "ty1 occurs in ty2" 
+                  if occurs_check then type1 |--> CONAPP (typ2, types2)
+                  else raise TypeError "ty1 occurs in ty2"
                 end
           |   solver (CONAPP type1, TYVAR type2) = solver (ty2, ty1)
 
@@ -1756,6 +1750,11 @@ val () = Unit.checkAssert "CONAPP CONAPP hasSolution"
       (CONAPP (TYVAR "a", [inttype, booltype]) ~ 
        CONAPP (inttype  , [inttype,booltype]))) 
 
+val () = Unit.checkAssert "CONAPP CONAPP hasSolution"
+    (fn () => hasNoSolution 
+      (CONAPP (TYVAR "a", [TYVAR "b", booltype]) ~ 
+       CONAPP (TYVAR "b", [CONAPP (TYVAR "list", [TYVAR "a"]),booltype]))) 
+
 val () = Unit.checkAssert "TYVAR CONNAP hasNoSolution"
     (fn () => hasNoSolution (TYVAR "'a" ~ (CONAPP (TYCON "list", [TYVAR "'a"])))) 
 
@@ -1785,8 +1784,28 @@ fun typeof (e, Gamma) =
         of NUM   _ => (inttype, TRIVIAL)
         |  BOOLV _ => (booltype, TRIVIAL)
         |  SYM   _ => (symtype, TRIVIAL)
-        (* |  NIL     => raise LeftAsExercise "finishthis"
-        |  PAIR  _ => raise LeftAsExercise "finishthis" *)
+        |  NIL     => 
+            let 
+                val alpha = freshtyvar() 
+            in 
+                (listtype alpha, TRIVIAL)
+            end 
+        |  PAIR  (var, NIL) => 
+            let
+              val (tau, C1) = literal var
+            in
+              (listtype tau, C1)
+            end
+        |  PAIR (v1, v2) => 
+            let
+              val (tau1, C1) = literal v1
+              val (tau2, C1) = literal v2
+            in
+              if false then (inttype , TRIVIAL)
+              else raise TypeError (typeString tau2)
+            end
+        (* | CLOSURE   _ => raise BugInTypeInference "cant appear in a literal node"
+        | PRIMITIVE _ => raise BugInTypeInference "cant appear in a literal node" *)
         |  _ => raise LeftAsExercise "finishthis"
 
 (* function [[ty]], to infer the type of a \nml\ expression, given [[Gamma]] 438c *)
@@ -1848,7 +1867,7 @@ fun typeof (e, Gamma) =
               val theta = solve(C1)
               val cons = List.map 
                 (fn (var) => 
-                  let val alpha = freshtyvar ()
+                  let val alpha = TYVAR var
                   in (alpha ~ (tysubst theta alpha))
                   end) 
                 (inter (dom theta, freetyvarsGamma Gamma))
@@ -1874,7 +1893,7 @@ fun typeof (e, Gamma) =
         | ty (LETX (LETREC, bs, body)) = 
         (*  1. Pattern match LAMBDA (list, exp)
             2. Create new gamma with bindnings (x, alpha)
-            3. Type check e1..en -> ([t1..tn, C_r]) 
+            3. Type check e1..en -> ([t1..tn], C_r) 
             4. Create C1, which is a conjunction of C_r and (t_i ~ alpha_i)
             5. Create theta that satisfies C1  (val theta = solve(C1))
             6. Create C' - conjunction of list (alpha ~ theta alpha) 
@@ -1884,40 +1903,38 @@ fun typeof (e, Gamma) =
            10. Return (tau, C' /\ C_b) *)
             let 
               val (xs,es) = ListPair.unzip bs
-              val alphas = List.map (fn _ => freshtyvar ()) xs
+              val alphas = List.map freshtyvar xs
               val extendedEnv = 
-                  ListPair.foldlEq (fn (x, alpha, acc) => bindtyscheme(x, FORALL([], alpha),acc)) Gamma (xs, alphas)
+                  ListPair.foldlEq 
+                    (fn (x, alpha, acc) => 
+                      bindtyscheme(x, FORALL([], alpha),acc)) 
+                    Gamma 
+                    (xs, alphas) 
               val (taus, C_r) = typesof(es, extendedEnv) 
-              val constraints = ListPair.mapEq (fn (tau, alpha) => (tau ~ alpha)) (taus, alphas)
-              val C1 = conjoinConstraints (C_r :: constraints)    
+              val C1 = 
+                ListPair.foldlEq 
+                  (fn (tau, alpha, acc) => 
+                     ((tau ~ alpha) /\ acc)) 
+                  C_r 
+                  (taus, alphas)
               val theta = solve C1
-              (* in LET and LETREC, what is the alpha here, refer to rules on p.426 *)
-              val cons = List.map 
+              val cons = List.map
                 (fn (var) => 
-                  let val alpha = freshtyvar ()
-                  in (alpha ~ (tysubst theta alpha))
+                  let val alpha = TYVAR var
+                  in (alpha ~ (varsubst theta var))
                   end) 
                 (inter (dom theta, freetyvarsGamma Gamma))
-              (* val cons = List.map 
-                  (fn (var) => 
-                    let val alpha = freshtyvar ()
-                    in (alpha ~ (tysubst theta alpha))
-                    end) 
-                  (freetyvarsGamma Gamma)  *)
-              (* val varTheta = List.map (dom theta *)
-              (* val cons = List.map (fn (a) => (a ~ (tysubst theta a))) (inter (dom theta, freetyvarsGamma Gamma)) *)
               val C' = conjoinConstraints cons
               val sigmas = 
                 List.map 
                   (fn (tau) => 
                     generalize(
                       tysubst theta tau, 
-                      union ((freetyvarsGamma Gamma), (freetyvarsConstraint C')))) 
+                      union ((freetyvarsGamma Gamma), (freetyvarsConstraint C' )))) 
                   taus
               val newGamma = 
                 ListPair.foldlEq 
-                  (fn (x, sigma, acc) => 
-                    bindtyscheme (x, sigma, acc)) 
+                  bindtyscheme
                   Gamma 
                   (xs, sigmas)
               val (tau, C_b) = typeof (body, newGamma)

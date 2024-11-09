@@ -24,9 +24,14 @@
 ;; step 5
 (check-principal-type (let ((x 10)) 20) int)
 (check-principal-type (let ((x 4) (y 6)) (* x y)) int)
+(check-principal-type (let ([g (lambda () 1)]) (g)) int) 
 (check-type-error (let ((x (if #t 1 #f))) x))
 
 (check-principal-type (letrec () 2) int)
 (check-principal-type (letrec ([g (lambda () 1)]) (g)) int) 
 (check-principal-type (letrec ([g (lambda (a) a)]) (g 5)) int) 
-(* (check-type-error (letrec ([g (lambda (a) a)]))) *)
+;; (check-type-error (letrec ([g (lambda (a) a)]) (g #t)))
+
+;; step 6
+(check-principal-type '() (forall ['a] (list 'a)))
+(check-principal-type '(1) (list int))
