@@ -1660,7 +1660,7 @@ fun solve c =
           (* |   solver (CONAPP (typ1, []), CONAPP (typ2, [])) = solver (typ1, typ2) *)
           |   solver (CONAPP (typ1, types1), CONAPP (typ2, types2)) =  
                 let
-                  val C1 = (typ1 ~ typ2)
+                  val C1 = typ1 ~ typ2
                   val C2 = ListPair.foldlEq (fn (t1, t2, acc) => (t1 ~ t2) /\ acc) TRIVIAL (types1, types2)
                 in
                   solve (C1 /\ C2)
@@ -1761,7 +1761,7 @@ val () = Unit.checkAssert "TYVAR CONNAP hasNoSolution"
 (* Q: Do we need to check the 1st arg of CONAPP? *)
 val () = Unit.checkAssert "TYVAR CONAPP hasSolution"
     (fn () => hasSolution
-      (TYVAR "a" ~ CONAPP ((TYVAR "b", [inttype, booltype]))))
+      (TYVAR "a" ~ CONAPP (TYVAR "b", [inttype, booltype])))
 
 (* utility functions for {\uml} S435c *)
 (* filled in when implementing uML *)
@@ -1804,9 +1804,10 @@ fun typeof (e, Gamma) =
               if eqType (listtype tau1, tau2) then (tau2 , C1 /\ C2)
               else raise TypeError "PAIR type error"
             end
-        (* | CLOSURE   _ => raise BugInTypeInference "cant appear in a literal node"
-        | PRIMITIVE _ => raise BugInTypeInference "cant appear in a literal node" *)
-        |  _ => raise LeftAsExercise "finishthis"
+        | CLOSURE   _ => 
+            raise BugInTypeInference "cant appear in a literal node"
+        | PRIMITIVE _ => 
+            raise BugInTypeInference "cant appear in a literal node" 
 
 (* function [[ty]], to infer the type of a \nml\ expression, given [[Gamma]] 438c *)
       fun ty (LITERAL n) = literal n
@@ -1864,11 +1865,11 @@ fun typeof (e, Gamma) =
             let
               val (xs, es) = ListPair.unzip bs
               val (taus, C1) = typesof(es, Gamma)
-              val theta = solve(C1)
+              val theta = solve C1
               val cons = List.map 
                 (fn (var) => 
                   let val alpha = TYVAR var
-                  in (alpha ~ (tysubst theta alpha))
+                  in alpha ~ (tysubst theta alpha)
                   end) 
                 (inter (dom theta, freetyvarsGamma Gamma))
               val C' = conjoinConstraints cons
@@ -1877,7 +1878,7 @@ fun typeof (e, Gamma) =
                   (fn (tau) => 
                     generalize(
                       tysubst theta tau, 
-                      union ((freetyvarsGamma Gamma), (freetyvarsConstraint C' )))) 
+                      union (freetyvarsGamma Gamma, freetyvarsConstraint C' ))) 
                   taus
               val bindings = ListPair.zipEq (xs, sigmas)
               val newGamma = 
@@ -1914,14 +1915,14 @@ fun typeof (e, Gamma) =
               val C1 = 
                 ListPair.foldlEq 
                   (fn (tau, alpha, acc) => 
-                     ((tau ~ alpha) /\ acc)) 
+                    tau ~ alpha /\ acc) 
                   C_r 
                   (taus, alphas)
               val theta = solve C1
               val cons = List.map
                 (fn (var) => 
                   let val alpha = TYVAR var
-                  in (alpha ~ (varsubst theta var))
+                  in alpha ~ (varsubst theta var)
                   end) 
                 (inter (dom theta, freetyvarsGamma Gamma))
               val C' = conjoinConstraints cons
@@ -1930,7 +1931,7 @@ fun typeof (e, Gamma) =
                   (fn (tau) => 
                     generalize(
                       tysubst theta tau, 
-                      union ((freetyvarsGamma Gamma), (freetyvarsConstraint C' )))) 
+                      union (freetyvarsGamma Gamma, freetyvarsConstraint C' ))) 
                   taus
               val newGamma = 
                 ListPair.foldlEq 
@@ -2790,15 +2791,34 @@ val primitiveBasis =
                                                      "car applied to non-list"),
                                funtype ([listtype alpha], alpha)) ::
                      ("cdr",   unaryOp
-                                 (fn (PAIR (_, cdr)) => cdr 
-                                   | NIL => raise RuntimeError
-                                                     "cdr applied to empty list"
-                                   | _   => raise BugInTypeInference
-                                                     "cdr applied to non-list"),
-                               funtype ([listtype alpha], listtype alpha)) :: 
-                     [])
+                                (fn (PAIR (_, cdr)) => cdr 
+                                  | NIL => raise RuntimeError
+                                               "cdr applied to empty list"
+                                  | _   => raise BugInTypeInference
+                                               "cdr applied to non-list"),
+                              funtype ([listtype alpha], listtype alpha))
+                                                                        ::
+                     ("pair",  binaryOp (fn (a, b) => PAIR (a, b)),
+                              funtype ([alpha, beta]
+                                      , pairtype (alpha, beta)))
+                                                                        ::
+                     ("fst",  unaryOp 
+                                (fn (PAIR (a, b)) => a
+                                  | _ => raise RuntimeError
+                                              "fst applies to non-pair"),
+                              funtype ([pairtype (alpha, beta)]
+                                      , alpha))
+                                                                        ::
+                     ("snd",  unaryOp 
+                                (fn (PAIR (a, b)) => b
+                                  | _ => raise RuntimeError
+                                              "snd applies to non-pair"),
+                              funtype ([pairtype (alpha, beta)]
+                                      , beta))
+                                                                        ::
+                    [])
   end
-val predefined_included = false
+val predefined_included = true
 val predefs = if not predefined_included then [] else
                [ ";  predefined {\\nml} functions S423b "
                , "(define bind (x y alist)"

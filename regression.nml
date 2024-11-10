@@ -30,8 +30,17 @@
 (check-principal-type (letrec () 2) int)
 (check-principal-type (letrec ([g (lambda () 1)]) (g)) int) 
 (check-principal-type (letrec ([g (lambda (a) a)]) (g 5)) int) 
-;; (check-type-error (letrec ([g (lambda (a) a)]) (g #t)))
+(check-type-error (letrec ([g (lambda (a) (+ a 1))]) (g 'a)))
 
 ;; step 6
 (check-principal-type '() (forall ['a] (list 'a)))
 (check-principal-type '(1) (list int))
+(check-principal-type '(1 2 3) (list int))
+(check-type-error '(1 'b ))
+
+;; step 8
+(check-principal-type (map (lambda (x) x) '(1 2 3)) (list int))
+(check-principal-type (filter (lambda (x) (= x 0)) '(2 4 8)) (list int))
+(check-principal-type (exists? (lambda (x) (= x 0)) '(2 3 4)) bool) 
+(check-principal-type (foldr (lambda (x acc) (+ acc x)) 0 '(1 2 3 4)) int)
+(check-type-error (foldr (lambda (x acc) (+ acc x)) 0 '('a 'b 'c)))
