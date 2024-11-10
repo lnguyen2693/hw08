@@ -1799,10 +1799,10 @@ fun typeof (e, Gamma) =
         |  PAIR (v1, v2) => 
             let
               val (tau1, C1) = literal v1
-              val (tau2, C1) = literal v2
+              val (tau2, C2) = literal v2
             in
-              if false then (inttype , TRIVIAL)
-              else raise TypeError (typeString tau2)
+              if eqType (listtype tau1, tau2) then (tau2 , C1 /\ C2)
+              else raise TypeError "PAIR type error"
             end
         (* | CLOSURE   _ => raise BugInTypeInference "cant appear in a literal node"
         | PRIMITIVE _ => raise BugInTypeInference "cant appear in a literal node" *)
