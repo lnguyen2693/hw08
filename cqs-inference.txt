@@ -290,7 +290,7 @@ outputs of type inference for expression (+ 3 2).
 
         And what does the type checker output for C?
 
-        > T /\ T /\ T /\ ('a × 'b → 'c) ~ (int x bool → 'm)
+        > ('a ~ int) /\ ('b ~ bool)
 
     (b) Assume that `f` is bound in Γ to the type scheme `∀.'a`.
         In judgment C, Γ ⊢ e : τ, what does the type checker output for τ?
@@ -299,8 +299,8 @@ outputs of type inference for expression (+ 3 2).
 
         And what does the type checker output for C?
 
-        > T /\ T /\ T /\ 
-        (ask if we just say that it fails)
+        > ( -> 'a) ~ (int x bool → 'm)
+        (fails)
 
     _You are ready for some of the easier parts of exercise 3._
 
@@ -333,10 +333,8 @@ references to that that function in this reading call it `too-poly`.
         the `lambda` expression in too-polymorphic type-check?  
         Put the word YES next to the best explanation:
 
-        (Ask - difference between option 1 and 3)
-
           - Parameter `empty-list` has to have type `(forall ('a)
-            (list 'a))`, but `τ₁` is not a `forall` type. YES
+            (list 'a))`, but `τ₁` is not a `forall` type.
 
           - Parameter `empty-list` has type `τ₁` = `(list 'a)`, which is
             not the same as `(list bool)`.

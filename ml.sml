@@ -1657,11 +1657,14 @@ fun solve c =
           |   solver (TYCON type1, TYCON type2) = 
                 if eqType (ty1, ty2) then idsubst
                 else raise TypeError "solve TYCON ~ TYCON"
-          (* |   solver (CONAPP (typ1, []), CONAPP (typ2, [])) = solver (typ1, typ2) *)
           |   solver (CONAPP (typ1, types1), CONAPP (typ2, types2)) =  
                 let
                   val C1 = typ1 ~ typ2
-                  val C2 = ListPair.foldlEq (fn (t1, t2, acc) => (t1 ~ t2) /\ acc) TRIVIAL (types1, types2)
+                  val C2 = 
+                    ListPair.foldlEq 
+                      (fn (t1, t2, acc) => (t1 ~ t2) /\ acc) 
+                      TRIVIAL 
+                      (types1, types2)
                 in
                   solve (C1 /\ C2)
                 end
@@ -1695,7 +1698,8 @@ fun solve c =
 
 
 fun isIdempotent pairs =
-  let fun distinct a' (a, tau) = a <> a' andalso not (member a' (freetyvars tau))
+  let fun distinct a' (a, tau) = a <> a' andalso 
+                                 not (member a' (freetyvars tau))
       fun good (prev', (a, tau)::next) =
             List.all (distinct a) prev' andalso List.all (distinct a) next
             andalso good ((a, tau)::prev', next)
@@ -1731,7 +1735,8 @@ val () = Unit.checkAssert "same type variables"
     (fn () => solutionEquivalentTo (TYVAR "a" ~ TYVAR "a", []))
 
 val () = Unit.checkAssert "different type variables"
-    (fn () => solutionEquivalentTo (TYVAR "b" ~ TYVAR "a", "b" |--> (TYVAR "a")))
+    (fn () => solutionEquivalentTo (
+      TYVAR "b" ~ TYVAR "a", "b" |--> (TYVAR "a")))
 
 val () = Unit.checkAssert "int ~ int can be solved"
     (fn () => solutionEquivalentTo (inttype ~ inttype, idsubst))
@@ -1756,7 +1761,8 @@ val () = Unit.checkAssert "CONAPP CONAPP hasSolution"
        CONAPP (TYVAR "b", [CONAPP (TYVAR "list", [TYVAR "a"]),booltype]))) 
 
 val () = Unit.checkAssert "TYVAR CONNAP hasNoSolution"
-    (fn () => hasNoSolution (TYVAR "'a" ~ (CONAPP (TYCON "list", [TYVAR "'a"])))) 
+    (fn () => 
+      hasNoSolution (TYVAR "'a" ~ (CONAPP (TYCON "list", [TYVAR "'a"])))) 
 
 (* Q: Do we need to check the 1st arg of CONAPP? *)
 val () = Unit.checkAssert "TYVAR CONAPP hasSolution"
